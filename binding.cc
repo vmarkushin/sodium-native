@@ -458,6 +458,62 @@ NAN_METHOD(crypto_sign_detached) {
   CALL_SODIUM(crypto_sign_detached(CDATA(signature), &signature_length_dummy, CDATA(message), CLENGTH(message), CDATA(secret_key)))
 }
 
+NAN_METHOD(crypto_sign_batch_create) {
+  ASSERT_BUFFER_MIN_LENGTH(info[0], signature, crypto_sign_BYTES, crypto_sign_bytes())
+  ASSERT_BUFFER_MIN_LENGTH(info[2], secret_key, crypto_sign_SECRETKEYBYTES, crypto_sign_secretkeybytes())
+
+  if (!info[1]->IsArray()) {
+    Nan::ThrowError("batch must be an array of buffers");
+    return;
+  }
+
+  v8::Local<v8::Array> buffers = info[1].As<v8::Array>();
+
+  crypto_sign_state state;
+  crypto_sign_init(&state);
+
+  uint32_t len = buffers->Length();
+  for (uint32_t i = 0; i < len; i++) {
+    v8::Local<v8::Value> buf = buffers->Get(Nan::GetCurrentContext(), i).ToLocalChecked();
+    if (!buf->IsObject()) {
+      Nan::ThrowError("batch must be an array of buffers");
+      return;
+    }
+    crypto_sign_update(&state, CDATA(buf), CLENGTH(buf));
+  }
+
+  unsigned long long signature_length_dummy; // TODO: what is this used for?
+
+  CALL_SODIUM_BOOL(crypto_sign_final_create(&state, CDATA(signature), &signature_length_dummy, CDATA(secret_key)))
+}
+
+NAN_METHOD(crypto_sign_batch_verify) {
+  ASSERT_BUFFER_MIN_LENGTH(info[0], signature, crypto_sign_BYTES, crypto_sign_bytes())
+  ASSERT_BUFFER_MIN_LENGTH(info[2], public_key, crypto_sign_PUBLICKEYBYTES, crypto_sign_publickeybytes())
+
+  if (!info[1]->IsArray()) {
+    Nan::ThrowError("batch must be an array of buffers");
+    return;
+  }
+
+  v8::Local<v8::Array> buffers = info[1].As<v8::Array>();
+
+  crypto_sign_state state;
+  crypto_sign_init(&state);
+
+  uint32_t len = buffers->Length();
+  for (uint32_t i = 0; i < len; i++) {
+    v8::Local<v8::Value> buf = buffers->Get(Nan::GetCurrentContext(), i).ToLocalChecked();
+    if (!buf->IsObject()) {
+      Nan::ThrowError("batch must be an array of buffers");
+      return;
+    }
+    crypto_sign_update(&state, CDATA(buf), CLENGTH(buf));
+  }
+
+  CALL_SODIUM_BOOL(crypto_sign_final_verify(&state, CDATA(signature), CDATA(public_key)))
+}
+
 NAN_METHOD(crypto_sign_ed25519_pk_to_curve25519) {
   ASSERT_BUFFER_MIN_LENGTH(info[0], curve25519_pk, crypto_box_PUBLICKEYBYTES, crypto_box_publickeybytes())
   ASSERT_BUFFER_MIN_LENGTH(info[1], ed25519_pk, crypto_sign_PUBLICKEYBYTES, crypto_sign_publickeybytes())
@@ -1336,6 +1392,9 @@ NAN_MODULE_INIT(InitAll) {
   EXPORT_FUNCTION(crypto_sign_open)
   EXPORT_FUNCTION(crypto_sign_detached)
   EXPORT_FUNCTION(crypto_sign_verify_detached)
+  EXPORT_FUNCTION(crypto_sign_batch_create)
+  EXPORT_FUNCTION(crypto_sign_batch_verify)
+
   EXPORT_FUNCTION(crypto_sign_ed25519_pk_to_curve25519)
   EXPORT_FUNCTION(crypto_sign_ed25519_sk_to_curve25519)
   EXPORT_FUNCTION(crypto_sign_ed25519_sk_to_pk)

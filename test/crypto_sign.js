@@ -94,3 +94,20 @@ tape('crypto_sign_detached', function (t) {
 
   t.end()
 })
+
+tape('crypto_sign_ed25519ph_batch', function (t) {
+  var pk = Buffer.alloc(sodium.crypto_sign_PUBLICKEYBYTES)
+  var sk = Buffer.alloc(sodium.crypto_sign_SECRETKEYBYTES)
+
+  sodium.crypto_sign_keypair(pk, sk)
+
+  var message = Buffer.from('Hello, World!')
+  var signature = Buffer.alloc(sodium.crypto_sign_BYTES)
+
+  sodium.crypto_sign_batch_create(signature, [message], sk)
+
+  t.notOk(sodium.crypto_sign_batch_verify(signature, [Buffer.alloc(message.length)], pk), 'was not signed')
+  t.ok(sodium.crypto_sign_batch_verify(signature, [message], pk), 'was signed')
+
+  t.end()
+})
